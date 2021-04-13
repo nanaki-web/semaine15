@@ -66,13 +66,15 @@ CREATE TABLE waz_photos
 CREATE TABLE waz_employes
 (
    emp_id INT(10) NOT NULL AUTO_INCREMENT,
-   emp_nom VARCHAR(50) NOT NULL CHECK (CHARACTER_LENGTH(emp_nom) > 2),-- accepte a partir de 3 caracteres 
+   emp_nom VARCHAR(50) NOT NULL CHECK (COALESCE(SUBSTRING(emp_nom, 1, 1), 'X') 
+                              BETWEEN 'A' AND 'Z' AND CHARACTER_LENGTH(emp_nom) > 2),-- accepte a partir de 3 caracteres 
    -- colaesce -> segmente la chaine caractere 
    -- substring -> renvoie la première valeur non nulle d'une liste.
-   emp_prenom VARCHAR(50) NOT NULL CHECK (COALESCE(SUBSTRING(emp_prenom, 1, 1), 'X') BETWEEN 'A' AND 'Z'),
+   emp_prenom VARCHAR(50) NOT NULL CHECK (COALESCE(SUBSTRING(emp_prenom, 1, 1), 'X') 
+                                 BETWEEN 'A' AND 'Z'AND CHARACTER_LENGTH(emp_prenom) > 2),
    emp_adresse VARCHAR(50) NOT NULL,
    emp_tel VARCHAR(50) NOT NULL ,
-   emp_mail VARCHAR(50) NOT NULL UNIQUE,
+   emp_mail VARCHAR(50) NOT NULL,
    emp_poste VARCHAR(50) NOT NULL,
    emp_mdp VARCHAR(50) NOT NULL,
    PRIMARY KEY(emp_id),
@@ -84,25 +86,20 @@ CREATE TABLE waz_employes
 CREATE TABLE waz_internautes
 (
    in_id INT(10) NOT NULL AUTO_INCREMENT,
-   in_nom VARCHAR(30) NOT NULL,
-   in_prenom VARCHAR(30) NOT NULL,
+   in_nom VARCHAR(30) NOT NULL CHECK(COALESCE(SUBSTRING(in_nom, 1, 1), 'X') 
+                              BETWEEN 'A' AND 'Z' AND CHARACTER_LENGTH(in_nom) > 2 ),
+   in_prenom VARCHAR(30) NOT NULL CHECK(COALESCE(SUBSTRING(in_prenom, 1, 1), 'X') 
+                                 BETWEEN 'A' AND 'Z' AND CHARACTER_LENGTH(in_prenom) > 2 ),
    in_adresse VARCHAR(50) NOT NULL,
    in_telephone VARCHAR(50) NOT NULL,
-   in_email VARCHAR(50) NOT NULL,
+   in_email VARCHAR(50) NOT NULL  ,
    in_pays VARCHAR(50) NOT NULL,
-   in_est_contacter BOOLEAN NOT NULL COMMENT '1=contacter 0=non contacter', 
-   PRIMARY KEY(in_id)
+   in_est_contacter BOOLEAN NOT NULL DEFAULT 0 CHECK (in_est_contacter IN ('0', '1') ) 
+   COMMENT '1=contacter 0=non contacter', 
+   PRIMARY KEY(in_id),
+   UNIQUE(in_email)
 );
-ALTER TABLE waz_internautes
-ADD CHECK (COALESCE(SUBSTRING(in_nom, 1, 1), 'X') BETWEEN 'A' AND 'Z' AND CHARACTER_LENGTH(in_nom) > 2 );
-ALTER TABLE waz_internautes
-ADD CHECK(COALESCE(SUBSTRING(in_prenom, 1, 1), 'X') BETWEEN 'A' AND 'Z' AND CHARACTER_LENGTH(in_prenom) > 2 );
-ALTER TABLE waz_internautes
-ADD UNIQUE (`in_telephone`);
-ALTER TABLE waz_internautes
-ADD in_est_contacter SET DEFAULT 0 ;-- (non necessaire)
-ALTER TABLE waz_internautes
-ADD CHECK (in_est_contacter IN ('0', '1') );
+
 
 
 -- Structure de la table waz_annonces
@@ -111,13 +108,13 @@ DROP TABLE IF EXISTS waz_annonces;
 CREATE TABLE waz_annonces
 (
    an_id INT(10) NOT NULL AUTO_INCREMENT,
-   an_prix DECIMAL(8,2) NOT NULL COMMENT 'Prix en euros',
-   an_est_active BOOLEAN NOT NULL COMMENT '1=active 0=non active',
+   an_prix DECIMAL(8,2) NOT NULL CHECK (an_prix>=0) COMMENT 'Prix en euros',
+   an_est_active BOOLEAN NOT NULL CHECK (an_est_active IN ('0','1')) COMMENT '1=active 0=non active',
    an_ref CHAR(20) NOT NULL COMMENT 'Référence de l''annonce',
    an_date_disponibilite DATE NOT NULL,
    an_offre CHAR(1) NOT NULL CHECK (an_offre IN ('A','L','V')) COMMENT 'Type d''offre. Lettres A, L ou V.',
-   an_nbre_vues SMALLINT(6) NOT NULL,
-   an_date_ajout DATE NOT NULL,
+   an_nbre_vues SMALLINT(6) NOT NULL CHECK (an_nbre_vues >=0),
+   an_date_ajout DATE NOT NULL DEFAULT (CURRENT_DATE),
    an_date_modif DATETIME DEFAULT NULL,
    an_titre VARCHAR(255) NOT NULL,
    bi_id INT(10) NOT NULL,
@@ -125,12 +122,6 @@ CREATE TABLE waz_annonces
    FOREIGN KEY(bi_id) REFERENCES waz_biens(bi_id),
    CONSTRAINT `chk_dateModif` CHECK (an_date_modif >= an_date_ajout or an_date_modif is NULL) 
 );
-ALTER TABLE waz_annonces
-ADD CHECK (an_prix>=0);
-ALTER TABLE waz_annonces
-ADD CHECK (an_est_active IN ('0','1'));
-ALTER TABLE waz_annonces
-ADD CHECK (an_nbre_vues >=0)
 
 -- Structure de la table waz_commentaire
 
@@ -163,15 +154,17 @@ CREATE TABLE waz_negocier
    emp_id INT(10),
    in_id INT(10),
    an_id INT(10),
-   neg_est_conclu BOOLEAN NOT NULL,
-   neg_montant_transaction DECIMAL(9,2) NOT NULL,
-   neg_date_debut_transaction DATE NOT NULL,
-   neg_date_transaction_fin DATE DEFAULT NULL,
-   neg_date_dernier_contact DATE NOT NULL,
+   neg_est_conclu BOOLEAN NOT NULL CHECK (neg_est_conclu IN ("0","1")),
+   neg_montant_transaction DECIMAL(9,2) NOT NULL CHECK (neg_montant_transaction>=0),
+   neg_date_debut_transaction DATE NOT NULL DEFAULT (CURRENT_DATE),
+   neg_date_transaction_fin DATE DEFAULT NULL ,
+   neg_date_dernier_contact DATE NOT NULL DEFAULT (CURRENT_DATE),
    PRIMARY KEY(emp_id, in_id, an_id),
    FOREIGN KEY(emp_id) REFERENCES waz_employes(emp_id),
    FOREIGN KEY(in_id) REFERENCES waz_internautes(in_id),
-   FOREIGN KEY(an_id) REFERENCES waz_annonces(an_id)
+   FOREIGN KEY(an_id) REFERENCES waz_annonces(an_id),
+   CONSTRAINT chk_DATEtransactionfin CHECK(neg_date_transaction_fin >=neg_date_debut_transaction or
+    neg_date_transaction_fin IS NULL )
 );
 
 -- Structure de la table waz_contacter
@@ -185,9 +178,6 @@ CREATE TABLE waz_contacter
    FOREIGN KEY(emp_id) REFERENCES waz_employes(emp_id),
    FOREIGN KEY(in_id) REFERENCES waz_internautes(in_id)
 );
-
-
-
 
 
 
